@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import scikitplot as skplt
+import folium
 
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, confusion_matrix, roc_curve, auc
 from sklearn.metrics import roc_auc_score, average_precision_score, RocCurveDisplay
@@ -129,3 +130,52 @@ def one_hot_to_string(df: pd.DataFrame, col: list) -> pd.DataFrame:
             df.drop(cols_to_concat, axis=1, inplace=True)
             
     return df
+
+
+
+# FOLIUM
+def plot_folium_map(y_test: np.array, y_pred: np.array) -> folium.Map:
+    # Criando o mapa centrado na primeira coordenada
+    map = folium.Map(
+        location=[-8.05, -34.95], 
+        zoom_start=15
+    )
+
+    # Adicionando pontos reais como CircleMarker
+    for point in y_test:
+        folium.CircleMarker(
+            location=[point[0], point[1]],
+            radius=1,  # tamanho do ponto
+            color='blue',
+            fill=True,
+            fill_color='blue'
+        ).add_to(map)
+
+    # Adicionando pontos preditos como CircleMarker
+    for point in y_pred:
+        folium.CircleMarker(
+            location=[point[0], point[1]],
+            radius=1,  # tamanho do ponto
+            color='red',
+            fill=True,
+            fill_color='red'
+        ).add_to(map)
+
+    # Adicionando legenda no mapa
+    legend_html = '''
+    <div style="
+        position: fixed; 
+        bottom: 50px; left: 50px; width: 150px; height: 90px; 
+        border:2px solid grey; z-index:9999; font-size:14px;
+        background-color:white;
+        ">
+        &nbsp;<b>Legenda</b> <br>
+        &nbsp;<i class="fa fa-circle" style="color:red"></i>&nbsp;Pontos Preditos<br>
+        &nbsp;<i class="fa fa-circle" style="color:blue"></i>&nbsp;Pontos Reais
+    </div>
+    '''
+
+    map.get_root().html.add_child(folium.Element(legend_html))
+
+    # Exibindo o mapa
+    return map

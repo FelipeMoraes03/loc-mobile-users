@@ -2,6 +2,7 @@ pandas
 numpy
 matplotlib
 seaborn
+folium
 xgboost
 scikit-learn
 scikit-plot
