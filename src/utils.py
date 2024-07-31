@@ -134,27 +134,28 @@ def one_hot_to_string(df: pd.DataFrame, col: list) -> pd.DataFrame:
 
 
 # FOLIUM
-def plot_folium_map(y_test: np.array, y_pred: np.array) -> folium.Map:
+def plot_folium_map(y_test: np.array, y_pred: np.array, connect_point: bool = False) -> folium.Map:
     # Criando o mapa centrado na primeira coordenada
     map = folium.Map(
         location=[-8.05, -34.95], 
         zoom_start=15
     )
 
-    # Adicionando pontos reais como CircleMarker
-    for point in y_test:
+    # Adicionando linhas conectando os pontos reais e preditos
+    for real, pred in zip(y_test, y_pred):
+        if connect_point:
+            folium.PolyLine(locations=[real, pred], color='black', weight=1).add_to(map)
+
         folium.CircleMarker(
-            location=[point[0], point[1]],
+            location=[real[0], real[1]],
             radius=1,  # tamanho do ponto
             color='blue',
             fill=True,
             fill_color='blue'
         ).add_to(map)
 
-    # Adicionando pontos preditos como CircleMarker
-    for point in y_pred:
         folium.CircleMarker(
-            location=[point[0], point[1]],
+            location=[pred[0], pred[1]],
             radius=1,  # tamanho do ponto
             color='red',
             fill=True,
@@ -179,3 +180,20 @@ def plot_folium_map(y_test: np.array, y_pred: np.array) -> folium.Map:
 
     # Exibindo o mapa
     return map
+
+def calculate_accuracy(y_pred, y_true, threshold=0.0001):
+    """
+    Calculate the accuracy based on the Euclidean distance between real and estimated positions.
+
+    Parameters:
+    y_pred (array): Estimated positions.
+    y_true (array): Real positions.
+    threshold (float): Distance threshold to consider a prediction as accurate.
+
+    Returns:
+    float: Accuracy as the percentage of predictions within the threshold.
+    """
+    distances = np.linalg.norm(y_pred - y_true, axis=1)
+    accurate_predictions = np.sum(distances <= threshold)
+    accuracy = (accurate_predictions / len(distances))
+    return accuracy
