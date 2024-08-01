@@ -197,3 +197,56 @@ def calculate_accuracy(y_pred, y_true, threshold=0.0001):
     accurate_predictions = np.sum(distances <= threshold)
     accuracy = (accurate_predictions / len(distances))
     return accuracy
+
+
+def distance_calc(coord1, coord2):
+    # Radius of the Earth in meters
+    R = 6371000
+    
+    # Convert latitude and longitude from degrees to radians
+    lat1, lon1 = np.radians(coord1)
+    lat2, lon2 = np.radians(coord2)
+    
+    # Differences in coordinates
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    
+    # Haversine formula
+    a = np.sin(dlat / 2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2)**2
+    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+    
+    # Distance in meters
+    distance = R * c
+    return distance
+
+
+def get_error_distances(y_pred, y_true):
+    return np.array([distance_calc(pred, true) for pred, true in zip(y_pred, y_true)])
+
+def print_errors(distances : list):
+    print(f"Erro de localização médio: {sum(distances) / len(distances):.3f} metros")
+    print(f"Erro mínimo: {min(distances)} metros")
+    print(f"Erro máximo: {max(distances):.3f} metros")
+    print(f"Desvio Padrão do erro: {np.std(distances):.3f} metros")
+
+def plot_boxplot(name: str, dist: list):
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    box = ax.boxplot([dist], 
+                     patch_artist=True,
+                     labels=[name],
+                     boxprops=dict(facecolor='lightblue', color='blue'),
+                     medianprops=dict(color='red'),
+                     whiskerprops=dict(color='blue'),
+                     capprops=dict(color='blue'),
+                     flierprops=dict(markerfacecolor='blue', marker='o', markersize=5, linestyle='none', markeredgecolor='blue')
+    )
+    
+    ax.set_title('BoxPlot do erro', fontsize=16)
+    ax.set_ylabel('Erro em metros', fontsize=14)
+    ax.set_xlabel('Modelo', fontsize=14)
+    ax.yaxis.grid(True, linestyle='--', linewidth=0.7)
+    ax.xaxis.grid(True, linestyle='--', linewidth=0.7)
+    ax.tick_params(axis='both', which='major', labelsize=12)
+    
+    plt.show()
