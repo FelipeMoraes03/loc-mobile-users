@@ -11,15 +11,21 @@ from sklearn.metrics import roc_auc_score, average_precision_score, RocCurveDisp
 
 
 
-# DATA TREATMENT
+# ----- DATA TREATMENT ----------------------------------------------------------------------------------------------------
 
 # Split a dataframe into train, validation and test
-def split_data(df : pd.DataFrame) -> list[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def split_data(df : pd.DataFrame, train_frac: float = 0.5, val_frac: float = 0.25, 
+               test_frac: float = 0.25) -> list[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+
+    assert train_frac + val_frac + test_frac == 1
+
+    df = df.sample(frac=1, replace=False).reset_index(drop=True)
+
     qtd_lines = df.shape[0]
 
-    train = df.iloc[:int(qtd_lines * 0.7)]
-    validation = df.iloc[int(qtd_lines * 0.7) : int(qtd_lines * 0.85)]
-    test = df.iloc[int(qtd_lines * 0.85):]
+    train = df.iloc[:int(qtd_lines * train_frac)]
+    validation = df.iloc[int(qtd_lines * train_frac) : int(qtd_lines * (1-test_frac))]
+    test = df.iloc[int(qtd_lines * (1-test_frac)):]
 
     return train, validation, test
 
@@ -35,9 +41,13 @@ def random_oversampling(num_samples : int, df : pd.DataFrame) -> pd.DataFrame:
 
 # Split a dataframe into train, validation and test and
 # Balances the number of instances on train and validation
-def split_and_balance(df0: pd.DataFrame, df1: pd.DataFrame) -> list[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    df0_train, df0_val, df0_test = split_data(df0)
-    df1_train, df1_val, df1_test = split_data(df1)
+def split_and_balance(df0: pd.DataFrame, df1: pd.DataFrame, train_frac: float = 0.5, val_frac: float = 0.25, 
+                      test_frac: float = 0.25) -> list[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    
+    assert train_frac + val_frac + test_frac == 1
+
+    df0_train, df0_val, df0_test = split_data(df0, train_frac, val_frac, test_frac)
+    df1_train, df1_val, df1_test = split_data(df1, train_frac, val_frac, test_frac)
 
     if df0.shape[0] < df1.shape[0]:
         df0_train = random_oversampling(df1_train.shape[0], df0_train)
@@ -57,9 +67,97 @@ def split_and_balance(df0: pd.DataFrame, df1: pd.DataFrame) -> list[pd.DataFrame
 
     return df_train, df_val, df_test
 
+# Balances the distribution of points on the map
+def balance_distribution(df: pd.DataFrame) -> pd.DataFrame:
+    lat_min, lat_max = df['lat'].min(), df['lat'].max()
+    lon_min, lon_max = df['lon'].min(), df['lon'].max()
+
+    lat_bins = np.linspace(lat_min, lat_max, 11)
+    lon_bins = np.linspace(lon_min, lon_max, 11)
+
+    df_copy = df.copy()
+
+    df_copy.loc[:, 'lat_bin'] = pd.cut(df_copy['lat'], bins=lat_bins, labels=False, include_lowest=True)
+    df_copy.loc[:, 'lon_bin'] = pd.cut(df_copy['lon'], bins=lon_bins, labels=False, include_lowest=True)
+
+    grid_counts = df_copy.groupby(['lat_bin', 'lon_bin']).size().unstack(fill_value=0)
+
+    max_count = grid_counts.max().max()
+    oversampled_df = pd.DataFrame()
+
+    for (i, j), count in np.ndenumerate(grid_counts.values):
+        if count > 0:
+            bin_df = df_copy[(df_copy['lat_bin'] == i) & (df_copy['lon_bin'] == j)]
+            oversampled_bin_df = random_oversampling(max_count, bin_df)
+            oversampled_df = pd.concat([oversampled_df, oversampled_bin_df])
+
+    oversampled_df.reset_index(drop=True, inplace=True)
+
+    oversampled_df.loc[:, 'lat_bin'] = pd.cut(oversampled_df['lat'], bins=lat_bins, labels=False, include_lowest=True)
+    oversampled_df.loc[:, 'lon_bin'] = pd.cut(oversampled_df['lon'], bins=lon_bins, labels=False, include_lowest=True)
+    
+    grid_counts = oversampled_df.groupby(['lat_bin', 'lon_bin']).size().unstack(fill_value=0)
+
+    oversampled_df.drop(['lat_bin', 'lon_bin'], axis=1, inplace=True)
+    oversampled_df = oversampled_df.sample(frac=1, replace=False).reset_index(drop=True)
+
+    return oversampled_df
 
 
-# MODEL EVALUATION
+
+# ----- DATA ANALYTICS ----------------------------------------------------------------------------------------------------
+
+# Compares instances distribution of over the variable 'indoor'
+def plot_distribution_comp(df):
+    colors = df['indoor'].map({True: 'red', False: 'blue'})
+
+    plt.scatter(df['lon'], df['lat'], c=colors, alpha=0.3, edgecolors='w', linewidth=0.5)
+    
+    plt.title('Latitude vs Longitude')
+    plt.xlabel('Longitude')
+    plt.ylabel('Latitude')
+    plt.grid(True)
+    
+    plt.xlim(-34.9605, -34.944)
+    plt.ylim(-8.06, -8.046)
+    
+    red_patch = plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='red', markersize=10, label='Indoor')
+    blue_patch = plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='blue', markersize=10, label='Outdoor')
+    plt.legend(handles=[red_patch, blue_patch])
+    
+    plt.show()
+
+def plot_heat_map(df: pd.DataFrame) -> None:
+    lat_min, lat_max = df['lat'].min(), df['lat'].max()
+    lon_min, lon_max = df['lon'].min(), df['lon'].max()
+
+    lat_bins = np.linspace(lat_min, lat_max, 11)
+    lon_bins = np.linspace(lon_min, lon_max, 11)
+
+    df_copy = df.copy()
+
+    df_copy.loc[:, 'lat_bin'] = pd.cut(df_copy['lat'], bins=lat_bins, labels=False, include_lowest=True)
+    df_copy.loc[:, 'lon_bin'] = pd.cut(df_copy['lon'], bins=lon_bins, labels=False, include_lowest=True)
+
+    grid_counts = df_copy.groupby(['lat_bin', 'lon_bin']).size().unstack(fill_value=0)
+
+    plt.figure(figsize=(10, 8))
+    plt.imshow(grid_counts, extent=[lon_min, lon_max, lat_min, lat_max], origin='lower', cmap='coolwarm', interpolation='nearest')
+    plt.colorbar(label='Número de Instâncias')
+    plt.title('Heat Map 10x10')
+    plt.xlabel('Longitude')
+    plt.ylabel('Latitude')
+
+    for (i, j), count in np.ndenumerate(grid_counts.values):
+        if count > 0:
+            lon_center = lon_bins[j] + (lon_bins[j+1] - lon_bins[j]) / 2
+            lat_center = lat_bins[i] + (lat_bins[i+1] - lat_bins[i]) / 2
+            plt.text(lon_center, lat_center, int(count), ha='center', va='center', color='white')
+
+    plt.show()
+
+
+# ----- MODEL EVALUATION --------------------------------------------------------------------------------------------------
 
 # Plot model's ROC curve
 def plot_roc_curve(y_pred: np.array, y_test: np.array) -> None:
@@ -131,56 +229,6 @@ def one_hot_to_string(df: pd.DataFrame, col: list) -> pd.DataFrame:
             
     return df
 
-
-
-# FOLIUM
-def plot_folium_map(y_test: np.array, y_pred: np.array, connect_point: bool = False, red_color : str = 'Pontos Preditos', blue_color : str ='Pontos Reais') -> folium.Map:
-    # Criando o mapa centrado na primeira coordenada
-    map = folium.Map(
-        location=[-8.05, -34.95], 
-        zoom_start=15
-    )
-
-    # Adicionando linhas conectando os pontos reais e preditos
-    for real, pred in zip(y_test, y_pred):
-        if connect_point:
-            folium.PolyLine(locations=[real, pred], color='black', weight=1).add_to(map)
-
-        folium.CircleMarker(
-            location=[real[0], real[1]],
-            radius=1,  # tamanho do ponto
-            color='blue',
-            fill=True,
-            fill_color='blue'
-        ).add_to(map)
-
-        folium.CircleMarker(
-            location=[pred[0], pred[1]],
-            radius=1,  # tamanho do ponto
-            color='red',
-            fill=True,
-            fill_color='red'
-        ).add_to(map)
-
-    # Adicionando legenda no mapa
-    legend_html = f'''
-    <div style="
-        position: fixed; 
-        bottom: 50px; left: 50px; width: 150px; height: 90px; 
-        border:2px solid grey; z-index:9999; font-size:14px;
-        background-color:white;
-        ">
-        &nbsp;<b>Legenda</b> <br>
-        &nbsp;<i class="fa fa-circle" style="color:red"></i>&nbsp;{red_color}<br>
-        &nbsp;<i class="fa fa-circle" style="color:blue"></i>&nbsp;{blue_color}
-    </div>
-    '''
-
-    map.get_root().html.add_child(folium.Element(legend_html))
-
-    # Exibindo o mapa
-    return map
-
 def calculate_accuracy(y_pred, y_true, threshold=0.0001):
     """
     Calculate the accuracy based on the Euclidean distance between real and estimated positions.
@@ -197,7 +245,6 @@ def calculate_accuracy(y_pred, y_true, threshold=0.0001):
     accurate_predictions = np.sum(distances <= threshold)
     accuracy = (accurate_predictions / len(distances))
     return accuracy
-
 
 def distance_calc(coord1, coord2):
     # Radius of the Earth in meters
@@ -250,3 +297,53 @@ def plot_boxplot(name: str, dist: list):
     ax.tick_params(axis='both', which='major', labelsize=12)
     
     plt.show()
+
+
+# ----- FOLIUM ------------------------------------------------------------------------------------------------------------
+
+def plot_folium_map(y_test: np.array, y_pred: np.array, connect_point: bool = False, red_color : str = 'Pontos Preditos', blue_color : str ='Pontos Reais') -> folium.Map:
+    # Criando o mapa centrado na primeira coordenada
+    map = folium.Map(
+        location=[-8.05, -34.95], 
+        zoom_start=15
+    )
+
+    # Adicionando linhas conectando os pontos reais e preditos
+    for real, pred in zip(y_test, y_pred):
+        if connect_point:
+            folium.PolyLine(locations=[real, pred], color='black', weight=1).add_to(map)
+
+        folium.CircleMarker(
+            location=[real[0], real[1]],
+            radius=1,  # tamanho do ponto
+            color='blue',
+            fill=True,
+            fill_color='blue'
+        ).add_to(map)
+
+        folium.CircleMarker(
+            location=[pred[0], pred[1]],
+            radius=1,  # tamanho do ponto
+            color='red',
+            fill=True,
+            fill_color='red'
+        ).add_to(map)
+
+    # Adicionando legenda no mapa
+    legend_html = f'''
+    <div style="
+        position: fixed; 
+        bottom: 50px; left: 50px; width: 150px; height: 90px; 
+        border:2px solid grey; z-index:9999; font-size:14px;
+        background-color:white;
+        ">
+        &nbsp;<b>Legenda</b> <br>
+        &nbsp;<i class="fa fa-circle" style="color:red"></i>&nbsp;{red_color}<br>
+        &nbsp;<i class="fa fa-circle" style="color:blue"></i>&nbsp;{blue_color}
+    </div>
+    '''
+
+    map.get_root().html.add_child(folium.Element(legend_html))
+
+    # Exibindo o mapa
+    return map
