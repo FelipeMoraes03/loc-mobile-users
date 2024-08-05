@@ -17,9 +17,9 @@ from sklearn.metrics import roc_auc_score, average_precision_score, RocCurveDisp
 def split_data(df : pd.DataFrame) -> list[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     qtd_lines = df.shape[0]
 
-    train = df.iloc[:int(qtd_lines * 0.5)]
-    validation = df.iloc[int(qtd_lines * 0.5) : int(qtd_lines * 0.75)]
-    test = df.iloc[int(qtd_lines * 0.75):]
+    train = df.iloc[:int(qtd_lines * 0.7)]
+    validation = df.iloc[int(qtd_lines * 0.7) : int(qtd_lines * 0.85)]
+    test = df.iloc[int(qtd_lines * 0.85):]
 
     return train, validation, test
 
