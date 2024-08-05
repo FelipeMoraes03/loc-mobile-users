@@ -134,7 +134,7 @@ def one_hot_to_string(df: pd.DataFrame, col: list) -> pd.DataFrame:
 
 
 # FOLIUM
-def plot_folium_map(y_test: np.array, y_pred: np.array, connect_point: bool = False) -> folium.Map:
+def plot_folium_map(y_test: np.array, y_pred: np.array, connect_point: bool = False, red_color : str = 'Pontos Preditos', blue_color : str ='Pontos Reais') -> folium.Map:
     # Criando o mapa centrado na primeira coordenada
     map = folium.Map(
         location=[-8.05, -34.95], 
@@ -163,7 +163,7 @@ def plot_folium_map(y_test: np.array, y_pred: np.array, connect_point: bool = Fa
         ).add_to(map)
 
     # Adicionando legenda no mapa
-    legend_html = '''
+    legend_html = f'''
     <div style="
         position: fixed; 
         bottom: 50px; left: 50px; width: 150px; height: 90px; 
@@ -171,8 +171,8 @@ def plot_folium_map(y_test: np.array, y_pred: np.array, connect_point: bool = Fa
         background-color:white;
         ">
         &nbsp;<b>Legenda</b> <br>
-        &nbsp;<i class="fa fa-circle" style="color:red"></i>&nbsp;Pontos Preditos<br>
-        &nbsp;<i class="fa fa-circle" style="color:blue"></i>&nbsp;Pontos Reais
+        &nbsp;<i class="fa fa-circle" style="color:red"></i>&nbsp;{red_color}<br>
+        &nbsp;<i class="fa fa-circle" style="color:blue"></i>&nbsp;{blue_color}
     </div>
     '''
 
