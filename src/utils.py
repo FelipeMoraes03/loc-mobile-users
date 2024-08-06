@@ -9,6 +9,10 @@ import folium
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, confusion_matrix, roc_curve, auc
 from sklearn.metrics import roc_auc_score, average_precision_score, RocCurveDisplay
 
+# seaborn style
+sns.set(style="whitegrid")
+
+
 
 
 # ----- DATA TREATMENT ----------------------------------------------------------------------------------------------------
@@ -296,6 +300,19 @@ def plot_boxplot(name: str, dist: list):
     ax.xaxis.grid(True, linestyle='--', linewidth=0.7)
     ax.tick_params(axis='both', which='major', labelsize=12)
     
+    plt.show()
+
+def plot_histogram(dist : np.ndarray):
+
+    plt.figure(figsize=(10, 6))
+    sns.histplot(dist, bins=50, kde=True)
+
+    plt.xlim(0, 25)
+
+    plt.title('Histograma dos Erros')
+    plt.xlabel('Erro em metros')
+    plt.ylabel('Instâncias')
+
     plt.show()
 
 
